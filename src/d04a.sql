@@ -1,7 +1,7 @@
 create table raw as
     select l, regexp_split_to_array(elem, '') bank
         from unnest(string_to_array(
-            (select content from read_text('d04.txt')), E'\n')) with ordinality a(elem, l)
+            (select content from read_text('d04t.txt')), E'\n')) with ordinality a(elem, l)
         where elem <> '';
 
 create table papers as
