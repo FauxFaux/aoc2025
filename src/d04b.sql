@@ -20,16 +20,15 @@ create macro grid(tl, tc, a) as (
 
 -- select ea(3,3, (select array_agg(row(l,r)) from values (1,1) v(l,r)));
 
-create table t as select l,c
-    from papers where (e(l  , c+1) + e(l  , c-1)
-    + e(l+1, c  ) + e(l-1, c  )
-    + e(l+1, c+1) + e(l+1, c-1)
-    + e(l-1, c+1) + e(l-1, c-1))
-       < 4;
+create table t as select l,c from (select l,c,grid(l, c, (select array_agg(row(l,c)) from papers where false)) cnt from papers where cnt < 4) fuck_you_duckdb;
 
 select * from t;
 
-
+select l,c from (
+select l,c,grid(l, c, (select array_agg(row(l,c)) from t)) cnt
+from papers
+where cnt < 4) f
+where not exists (select 1 from t where f.l=t.l and f.c=t.c);
 
 -- select array_agg(row(l,c)) from t;
 
@@ -38,16 +37,20 @@ select * from t;
 --     where grid(l, c, (select array_agg(row(l,c)) from t)) < 4;
 
         --
--- WITH RECURSIVE t(l, c) AS (
---     select l,c
---         from papers where
---           e(l  , c+1) + e(l  , c-1)
---         + e(l+1, c  ) + e(l-1, c  )
---         + e(l+1, c+1) + e(l+1, c-1)
---         + e(l-1, c+1) + e(l-1, c-1) < 4
---     UNION ALL
---         select l,c
---         from papers
---         where grid(l, c, (select array_agg(row(l,c)) from t)) < 4
--- )
--- SELECT l,c FROM t;
+WITH RECURSIVE t(l, c) AS (
+    select l,c
+    from (
+        select l,c,
+               grid(l, c,
+                (select array_agg(row(l,c)) from papers where false)) cnt
+        from papers
+        where cnt < 4
+    ) fuck_you_duckdb
+    UNION ALL
+    select l,c from (
+                        select l,c,grid(l, c, (select array_agg(row(l,c)) from t)) cnt
+                        from papers
+                        where cnt < 4) f
+    where not exists (select 1 from t where f.l=t.l and f.c=t.c)
+)
+SELECT l,c FROM t;
