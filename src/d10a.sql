@@ -10,7 +10,7 @@ create table machines_nr as
                     ','),
                     lambda y: y::int)) button
         from unnest(string_to_array(
-            (select content from read_text('d10t.txt')), E'\n'))
+            (select content from read_text('d10.txt')), E'\n'))
             with ordinality a(elem, nr);
 
 create table machines as
@@ -23,17 +23,28 @@ create table machines as
          from unnest(button) u(b)
         ) buttons from machines_nr;
 
-select i, right(i::bitstring::varchar, 4),
-    array_filter(['a', 'b', 'c', 'd'],
-        lambda x, n: (i & (1 << (n-1))))
-from generate_series(1, (pow(2, 4)-1)::int) gs(i)
-order by bit_count(i), i;
-
 create macro combos(arr) as (
     select array_agg(array_filter(arr,
         lambda x, n: (i & (1 << (n-1)))))
-    from generate_series(1, (pow(2, length(arr))-1)::int) as gs(i)
+    from generate_series(1, (pow(2, length(arr))-1)::int) gs(i)
     order by bit_count(i), i
 );
 
-select combos(buttons) from machines where nr = 1;
+-- fuck me
+-- select * from machines, combos(buttons);
+
+create view activate as
+    select nr, target, array_filter(buttons,
+        lambda x, n: (i & (1 << (n-1)))) active
+    from machines, generate_series(1,
+        (pow(2, length(buttons))-1)::int) gs(i);
+
+select sum(m) from (
+    select nr, min(l) m from (
+        select nr, length(active) l,
+           reduce(active,
+              lambda acc, x: xor(x, acc)
+           ) result
+        from activate where result=target
+    )  lens group by nr
+) each_len;
