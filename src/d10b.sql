@@ -14,44 +14,39 @@ create table machines as
             with ordinality a(elem, nr);
 
 -- select *, (select b from unnest(button) u(b) order by length(b) desc, b limit 1) long from machines o;
+-- select count(*),length(target) from machines group by 2 order by 1;
 
--- create table b1 as (
---     with with_max as (select nr, button, target,
---            reduce(array_filter(target, lambda x,n: n in button[1]),
---                   lambda a,b: least(a,b)) max_presses
---     from machines)
---     select nr, i as pushes, button[2:] button, apply(target,
---              lambda x,n: x+case n in button[1]
---                      when true then -i else 0 end
---            ) as target
---     from with_max, generate_series(0, max_presses) gs(i)
---     order by nr, i
--- );
+create table b0 as select * from machines where nr=3;
 
-select count(*),length(button) from machines group by 2 order by 2;
-create table b0 as select 0 as pushes, nr, target, (select array_agg(b order by length(b) desc) from unnest(button) u(b)) button
-from machines where length(button)<=5;
+create table max_presses as
+    select nr,bi,
+        reduce(array_filter(target, lambda x,n: (n-1) in button[bi]),
+            lambda a,b: least(a,b)) max_presses
+    from b0,
+        generate_series(1, length(button)) gs(bi) order by nr,bi;
 
--- select b from unnest((select button from b0)) u(b) order by length(b) desc, b desc;
+create table by_target as
+    select nr,ti,array_agg(bi) parts,any_value(target)[ti] eq, length(any_value(button)) as btns
+    from b0,
+         generate_series(1, length(button)) gs(bi),
+         generate_series(1, length(target)) gs2(ti)
+    where ((ti-1) in button[bi]) group by 1,2 order by 1,2;
 
-create view b1 as (with with_max as (select nr, pushes, button, target, case when button[1] is not null then reduce(array_filter(target, lambda x,n: (n-1) in button[1]), lambda a,b: least(a,b)) else 0 end max_presses
-from b0) select nr, pushes+i as pushes, button[2:] button, apply(target, lambda x,n: x+case (n-1) in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
+select * from max_presses;
+select * from by_target;
 
-create view b2 as (with with_max as (select nr, pushes, button, target, case when button[1] is not null then reduce(array_filter(target, lambda x,n: (n-1) in button[1]), lambda a,b: least(a,b)) else 0 end max_presses
-from b1) select nr, pushes+i as pushes, button[2:] button, apply(target, lambda x,n: x+case (n-1) in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
-
-create view b3 as (with with_max as (select nr, pushes, button, target, case when button[1] is not null then reduce(array_filter(target, lambda x,n: (n-1) in button[1]), lambda a,b: least(a,b)) else 0 end max_presses
-from b2) select nr, pushes+i as pushes, button[2:] button, apply(target, lambda x,n: x+case (n-1) in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
-
-create view b4 as (with with_max as (select nr, pushes, button, target, case when button[1] is not null then reduce(array_filter(target, lambda x,n: (n-1) in button[1]), lambda a,b: least(a,b)) else 0 end max_presses
-from b3) select nr, pushes+i as pushes, button[2:] button, apply(target, lambda x,n: x+case (n-1) in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
-
-create view b5 as (with with_max as (select nr, pushes, button, target, case when button[1] is not null then reduce(array_filter(target, lambda x,n: (n-1) in button[1]), lambda a,b: least(a,b)) else 0 end max_presses
-from b4) select nr, pushes+i as pushes, button[2:] button, apply(target, lambda x,n: x+case (n-1) in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
-
-create view b6 as (with with_max as (select nr, pushes, button, target, case when button[1] is not null then reduce(array_filter(target, lambda x,n: (n-1) in button[1]), lambda a,b: least(a,b)) else 0 end max_presses
-from b5) select nr, pushes+i as pushes, button[2:] button, apply(target, lambda x,n: x+case (n-1) in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
-
--- select * from b6 order by reduce(target, lambda a,b: a+b), pushes limit 100;
-select nr, min(pushes) from b6 where reduce(target, lambda a,b: a+b)=0 group by 1;
-
+select min(lenc) from (
+select *,reduce(guess,lambda a,b: a+b) lenc from (
+select count(distinct ti) c, guess, any_value(btns) btns from (
+select ti,[x1,x2,x3,x4,x5,x6] guess, btns,
+       reduce(parts, lambda acc, i: acc+[x1,x2,x3,x4,x5,x6][i], 0) summed, eq
+from
+    by_target,
+    generate_series(0, (select max_presses from max_presses where bi=1)) gs(x1),
+    generate_series(0, coalesce((select max_presses from max_presses where bi=2), 0)) gs(x2),
+    generate_series(0, coalesce((select max_presses from max_presses where bi=3), 0)) gs(x3),
+    generate_series(0, coalesce((select max_presses from max_presses where bi=4), 0)) gs(x4),
+    generate_series(0, coalesce((select max_presses from max_presses where bi=5), 0)) gs(x5),
+    generate_series(0, coalesce((select max_presses from max_presses where bi=6), 0)) gs(x6),
+where summed=eq) q group by guess) where c=(select count(*) from by_target)
+    );
