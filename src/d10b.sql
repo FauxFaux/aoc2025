@@ -27,28 +27,26 @@ create table machines as
 --     from with_max, generate_series(0, max_presses) gs(i)
 --     order by nr, i
 -- );
-create table b1 as ( with with_max as (select nr, button, target, reduce(array_filter(target, lambda x,n: n in button[1]), lambda a,b: least(a,b)) max_presses
-from machines where nr=1) select nr, i as pushes, button[2:] button, apply(target, lambda x,n: x+case n in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
+create table b0 as select 0 as pushes, * from machines where nr=2;
+
+create table b1 as (with with_max as (select nr, pushes, button, target, reduce(array_filter(target, lambda x,n: (n-1) in button[1]), lambda a,b: least(a,b)) max_presses
+from b0) select nr, pushes+i as pushes, button[2:] button, apply(target, lambda x,n: x+case (n-1) in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
 
 select * from b1;
 
-create table b2 as ( with with_max as (select nr, button, target, reduce(array_filter(target, lambda x,n: n in button[1]), lambda a,b: least(a,b)) max_presses
-from b1) select nr, i as pushes, button[2:] button, apply(target, lambda x,n: x+case n in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
+create table b2 as (with with_max as (select nr, pushes, button, target, reduce(array_filter(target, lambda x,n: (n-1) in button[1]), lambda a,b: least(a,b)) max_presses
+from b1) select nr, pushes+i as pushes, button[2:] button, apply(target, lambda x,n: x+case (n-1) in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
 
-select * from b2;
+create table b3 as (with with_max as (select nr, pushes, button, target, reduce(array_filter(target, lambda x,n: (n-1) in button[1]), lambda a,b: least(a,b)) max_presses
+from b2) select nr, pushes+i as pushes, button[2:] button, apply(target, lambda x,n: x+case (n-1) in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
 
-create table b3 as ( with with_max as (select nr, button, target, reduce(array_filter(target, lambda x,n: n in button[1]), lambda a,b: least(a,b)) max_presses
-from b2) select nr, i as pushes, button[2:] button, apply(target, lambda x,n: x+case n in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
+create table b4 as (with with_max as (select nr, pushes, button, target, reduce(array_filter(target, lambda x,n: (n-1) in button[1]), lambda a,b: least(a,b)) max_presses
+from b3) select nr, pushes+i as pushes, button[2:] button, apply(target, lambda x,n: x+case (n-1) in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
 
-create table b4 as ( with with_max as (select nr, button, target, reduce(array_filter(target, lambda x,n: n in button[1]), lambda a,b: least(a,b)) max_presses
-from b3) select nr, i as pushes, button[2:] button, apply(target, lambda x,n: x+case n in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
+create table b5 as (with with_max as (select nr, pushes, button, target, reduce(array_filter(target, lambda x,n: (n-1) in button[1]), lambda a,b: least(a,b)) max_presses
+from b4) select nr, pushes+i as pushes, button[2:] button, apply(target, lambda x,n: x+case (n-1) in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
 
-create table b5 as ( with with_max as (select nr, button, target, reduce(array_filter(target, lambda x,n: n in button[1]), lambda a,b: least(a,b)) max_presses
-from b4) select nr, i as pushes, button[2:] button, apply(target, lambda x,n: x+case n in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
+create table b6 as (with with_max as (select nr, pushes, button, target, reduce(array_filter(target, lambda x,n: (n-1) in button[1]), lambda a,b: least(a,b)) max_presses
+from b5) select nr, pushes+i as pushes, button[2:] button, apply(target, lambda x,n: x+case (n-1) in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
 
-create table b6 as ( with with_max as (select nr, button, target, reduce(array_filter(target, lambda x,n: n in button[1]), lambda a,b: least(a,b)) max_presses
-from b5) select nr, i as pushes, button[2:] button, apply(target, lambda x,n: x+case n in button[1] when true then -i else 0 end ) as target from with_max, generate_series(0, max_presses) gs(i) order by nr, i );
-
-
-
--- select * from b6 order by reduce(target, lambda a,b: a+b) limit 100;
+select * from b5 order by reduce(target, lambda a,b: a+b), pushes limit 100;
