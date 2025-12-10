@@ -96,12 +96,15 @@ create table uncons as
 --         where exists (select 1 from by_target r where l.nr=r.nr and parts=[i])
 --           and i in l.parts);
 
-select *, reduce(l.parts, lambda acc, x: acc + (case when x in r.parts then 1 else 0 end), 0) c
+select count(*) from uncons;
+
+select *, reduce(l.parts, lambda acc, x: acc + (case when x in r.parts then -1 else 0 end), length(l.parts)) c
 from uncons l, uncons r
 where l.nr=r.nr
   and l.nr=2
   and l.eq < r.eq
-  and length(l.parts)=length(r.parts)
-  and reduce(l.parts, lambda acc, x: acc + (case when x in r.parts then 1 else 0 end), 0) = length(l.parts)-1
+  and (length(l.parts)=length(r.parts))
+  and c=1
 order by l.parts;
 -- select nr, count(distinct n) from uncons, unnest(parts) u(n) group by 1 order by 1;
+
