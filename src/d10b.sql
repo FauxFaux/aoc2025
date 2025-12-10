@@ -16,7 +16,7 @@ create table machines as
 -- select *, (select b from unnest(button) u(b) order by length(b) desc, b limit 1) long from machines o;
 -- select count(*),length(target) from machines group by 2 order by 1;
 
-create table b0 as select * from machines;
+create table b0 as select * from machines where nr = 193;
 
 -- create table max_presses as
 --     select nr,bi,
@@ -95,16 +95,58 @@ create table uncons as
 --     where exists (select 1 from generate_series(1,10) gs(i)
 --         where exists (select 1 from by_target r where l.nr=r.nr and parts=[i])
 --           and i in l.parts);
-
-select count(*) from uncons;
-
-select *, reduce(l.parts, lambda acc, x: acc + (case when x in r.parts then -1 else 0 end), length(l.parts)) c
+--
+select 'to do', l.nr,
+       array_filter(l.parts, lambda x: not (x in r.parts))[1] p_from,
+       array_filter(r.parts, lambda x: not (x in l.parts))[1] p_to,
+       l.eq - r.eq rag,
+       reduce(l.parts, lambda acc, x: acc + (case when x in r.parts then -1 else 0 end), length(l.parts)) buggy_pos,
 from uncons l, uncons r
 where l.nr=r.nr
-  and l.nr=2
-  and l.eq < r.eq
+  and l.eq > r.eq
   and (length(l.parts)=length(r.parts))
-  and c=1
+  and buggy_pos=1
 order by l.parts;
+
+-- nr parts eq btns
+-- select * from uncons;
+
+select 'start state', * from uncons order by nr, length(parts), parts;
+--
+insert into uncons
+select
+    u.nr,
+    apply(parts, lambda x: case x when p_from then p_to else x end) parts,
+    eq - rag eq,
+    btns,
+from uncons u,(
+select l.nr,
+       array_filter(l.parts, lambda x: not (x in r.parts))[1] p_from,
+       array_filter(r.parts, lambda x: not (x in l.parts))[1] p_to,
+       l.eq - r.eq rag,
+       reduce(l.parts, lambda acc, x: acc + (case when x in r.parts then -1 else 0 end), length(l.parts)) buggy_pos,
+from uncons l, uncons r
+where l.nr=r.nr
+--   and l.nr=2
+  and l.eq > r.eq
+  and (length(l.parts)=length(r.parts))
+  and buggy_pos=1
+order by l.parts) m
+where u.nr=m.nr and m.p_from in u.parts and m.p_to not in u.parts;
+--
+-- select * from uncons where nr=1 order by nr, length(parts), parts;
+--
+
+create table t as select distinct * from uncons; drop table uncons; alter table t rename to uncons;
+select 'after', * from uncons order by nr, length(parts), parts;
+
+insert into uncons select l.nr, filter(l.parts, lambda x,n: not (x in r.parts)) parts, l.eq-r.eq eq, l.btns from uncons l, uncons r where l.nr=r.nr and l.parts @> r.parts and l.parts != r.parts and length(parts) != 0 order by l.nr;
+create table t as select distinct * from uncons; drop table uncons; alter table t rename to uncons;
+--
+-- insert into uncons select l.nr, filter(l.parts, lambda x,n: not (x in r.parts)) parts, l.eq-r.eq eq, l.btns from uncons l, uncons r where l.nr=r.nr and l.parts @> r.parts and l.parts != r.parts order by l.nr;
+-- create table t as select distinct * from uncons; drop table uncons; alter table t rename to uncons;
+-- select count(*) from uncons;
+--
+select * from uncons order by nr, length(parts), parts;
 -- select nr, count(distinct n) from uncons, unnest(parts) u(n) group by 1 order by 1;
 
