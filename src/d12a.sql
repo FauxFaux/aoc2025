@@ -52,14 +52,32 @@ create macro ex(x) as table
 
 create table shapes as (
     select n,
-           row_number() over (partition by n order by bam) perm,
-           bam shape
+           array_agg(bam) shapes
     from (
         select
             distinct n,
             apply(bam, lambda x: x::bitstring) bam
         from raw_shapes, ex(elem) s(bam)
-    ) t order by n, perm);
+    ) t group by n order by n);
 
 select * from shapes;
-select * from puzzles;
+select *, pow(6, list_sum(list))::int64 p from puzzles;
+
+-- horrific? generate_series outputting either (empty set) or (lots of zeros and ones) is quite annoying
+create macro lv_series(lv, i) as table
+    select to_base(n, (select length(shapes) from shapes where n=i-1)::int+1, lv[i]) from generate_series(
+        case lv[i] when 0 then 0 else 1 end,
+        case lv[i] when 0 then 0 else pow((select length(shapes) from shapes where n=i-1)+1, lv[i])::int64 - 1 end
+    ) g(n);
+
+create macro ls(lv) as table
+    select array[a,b,c,d,e,f] from
+         lv_series(lv, 1) g(a),
+         lv_series(lv, 2) g(b),
+         lv_series(lv, 3) g(c),
+         lv_series(lv, 4) g(d),
+         lv_series(lv, 5) g(e),
+         lv_series(lv, 6) g(f),
+    ;
+
+select * from ls(array[0,1,0,0,2,0]);
