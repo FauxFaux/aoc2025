@@ -65,13 +65,17 @@ select *, pow(6, list_sum(list))::int64 p from puzzles;
 
 -- horrific? generate_series outputting either (empty set) or (lots of zeros and ones) is quite annoying
 create macro lv_series(lv, i) as table
-    select to_base(n, (select length(shapes) from shapes where n=i-1)::int+1, lv[i]) from generate_series(
-        case lv[i] when 0 then 0 else 1 end,
-        case lv[i] when 0 then 0 else pow((select length(shapes) from shapes where n=i-1)+1, lv[i])::int64 - 1 end
+    select filter(split(
+        case n when -1 then ''
+            else to_base(n, (select length(shapes) from shapes where n=i-1)::int, lv[i]) end,
+        ''), lambda x: x <> '')::int64[] as arr
+    from generate_series(
+        case lv[i] when 0 then -1 else 0 end,
+        case lv[i] when 0 then -1 else pow((select length(shapes) from shapes where n=i-1), lv[i])::int64 - 1 end
     ) g(n);
 
 create macro ls(lv) as table
-    select array[a,b,c,d,e,f] from
+    select a,b,c,d,e,f from
          lv_series(lv, 1) g(a),
          lv_series(lv, 2) g(b),
          lv_series(lv, 3) g(c),
@@ -80,4 +84,15 @@ create macro ls(lv) as table
          lv_series(lv, 6) g(f),
     ;
 
-select * from ls(array[0,1,0,0,2,0]);
+select * from shapes;
+
+create macro exs(v, i) as (select array_agg(shapes[vi+1]) from unnest(v) u(vi) join shapes on (n=i));
+
+select list_concat(
+    exs(a, 0),
+    exs(b, 1),
+    exs(c, 2),
+    exs(d, 3),
+    exs(e, 4),
+    exs(f, 5))
+from ls(array[0,0,0,0,2,0]);
